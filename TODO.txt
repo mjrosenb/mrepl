@@ -1,0 +1,9 @@
+1) record the execution trace
+2) enable stepping of the execution trace
+3) make it more robust to assembler failures
+4) make it more robust to linker failures
+5) add in directives
+6) multiple terminals
+7) runtime configuration
+8) handle  resizes gracefully
+9) make debugging this easier
