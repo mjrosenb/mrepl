@@ -20,9 +20,10 @@
 #define Elf_Ehdr Elf64_Ehdr
 #include "BackEnd.h"
 #include "Debug.h"
+#include "ParseOutput.h"
 
 // fork and exec a program, with arguments.
-void run(const char *file, char *const argv[], RunLog &log)
+void run(const char *file, char *const argv[], tmpRunLog &log)
 {
     // for capturing stdout
     int pipeout[2];
@@ -40,13 +41,7 @@ void run(const char *file, char *const argv[], RunLog &log)
         int status;
         bool finished = false;
         fd_set rfds;
-        char **(logptr[2]) = {&log.out, &log.error};
-        int bufsize[2] = {4096, 4096};
-        int writesize[2] = {0,0};
-
-        for (int i = 0; i < 2; i++) {
-            *logptr[i] = (char*)malloc(bufsize[i]);
-        }
+        CharBuf *(bufs[2]) = {&log.out, &log.err};
 
         int maxFD = pipeout[0] > pipeerr[0] ? pipeout[0] : pipeerr[0];
         int opencount = 2;
@@ -67,17 +62,11 @@ void run(const char *file, char *const argv[], RunLog &log)
                         readfds[i] = -1;
                         opencount--;
                     }
-                    if (writesize[i]+size > bufsize[i]) {
-                        bufsize[i] *= 2;
-                        *logptr[i] = (char*)realloc(*logptr[i], bufsize[i]);
-                    }
-                    memcpy(*logptr[i] + writesize[i], buf, size);
-                    writesize[i] += size;
+                    bufs[i]->append(buf, size);
                 }
             }
         } while (opencount);
-        log.outsize = bufsize[0];
-        log.errsize = bufsize[1];
+
         if (waitpid(pid, &status, 0) && WIFEXITED(status)) {
             log.exitStatus = WEXITSTATUS(status);
         }
@@ -216,10 +205,12 @@ void generateMachineCode(Snippet *s, ExecutableInfo &info)
     // run the assembler, this kills the current program if it fails!
     // type carefully!
     char *const asargs[] = {"as", asname, "-o", objname, NULL};
-    run("as", asargs, info.aslog);
+    tmpRunLog tmp_as;
+    run("as", asargs, tmp_as);
     // run the linker, once again failure leads to termination
     char *const ldargs[] = {"ld", objname, "-o", exename, NULL};
-    run("ld", ldargs, info.ldlog);
+    tmpRunLog tmp_ld;
+    run("ld", ldargs, tmp_ld);
 
     // at this point, in exename, there  should be an executable binary!
     // we want to parse the binary, extract some information that we've embedded

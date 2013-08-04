@@ -26,6 +26,18 @@ Line::setText(char* newtext)
     free(editedText);
     editedText = NULL;
 }
+
+void
+Line::setError(char* newtext)
+{
+    text = newtext;
+
+    // Since the new line has been finalized, any temp lines
+    // are now obsolete.
+    // don't bother freeing error, it is guaranteed to point into an allocated structure.
+    error = newtext;
+}
+
 void
 Line::saveText(char* newtext)
 {
@@ -75,6 +87,11 @@ Line::dumpTableEntry(FILE *f, const char* name, int &labelNum) const
     labelNum++;
 }
 
+int
+Line::getLineNo()
+{
+    return lineno;
+}
 
 Snippet::Snippet() : name(""), code()
 {
@@ -106,4 +123,14 @@ Snippet::assignInsts(void**& insts)
         (*it)->setInst(insts);
     }
 
+}
+
+Line *
+Snippet::lookupLine(int num)
+{
+    for (list<Line*>::iterator it = code.begin(); it != code.end(); it++) {
+        if ((*it)->getLineNo() == num)
+            return *it;
+    }
+    return NULL;
 }

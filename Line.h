@@ -24,6 +24,8 @@ public:
     void setText(char *newtext);
     void saveText(char *newtext);
     char *restoreText() const;
+    void setError(char *err);
+    int getLineNo();
 };
 
 class MetaLine : public Line {
@@ -43,6 +45,7 @@ public:
     void setInst(void*);
     Snippet();
     void assignInsts(void**& insts);
+    Line *lookupLine(int num);
 };
 
 #endif

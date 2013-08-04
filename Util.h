@@ -17,3 +17,4 @@ typename list<T>::iterator next(typename list<T>::iterator &x)
     typename list<T>::iterator tmp = x;
     return ++tmp;
 }
+

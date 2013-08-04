@@ -2,11 +2,15 @@
 #define __MIDDLEEND_H
 #include "Line.h"
 
+struct LinesBuf {
+    int numLines;
+    int numChars;
+    char ** textLines;
+};
+
 struct RunLog {
-    int outsize;
-    char *out;
-    int errsize;
-    char *error;
+    LinesBuf out;
+    LinesBuf err;
     int exitStatus;
 };
 
