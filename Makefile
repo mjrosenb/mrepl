@@ -1,6 +1,6 @@
 LDFLAGS=`pkg-config --libs ncursesw` -lreadline -lstdc++
 LD=$(CXX)
-CXXFLAGS=-g
+CXXFLAGS=-g -Wall
 CC=clang
 CXX=clang++
 SRCS=MREPL.cc FrontEnd.cc Line.cc MiddleEnd.cc BackEnd.cc ParseOutput.cc
