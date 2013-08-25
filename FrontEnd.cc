@@ -45,7 +45,14 @@ void redraw_codebuffer(Snippet *snip)
         if (*cur_snippet->pos == *it) {
             wattron(codebuffer, A_REVERSE);
         }
+        if ((*it)->getError()) {
+            wattron(codebuffer, COLOR_PAIR(1));
+        }
         mvwprintw(codebuffer, lineno, 1, "%s", (*it)->render());
+        if ((*it)->getError()) {
+            wattroff(codebuffer, COLOR_PAIR(1));
+        }
+
         if (*cur_snippet->pos == *it) {
             wattroff(codebuffer, A_REVERSE);
         }
@@ -86,7 +93,10 @@ void redraw_regs(ExecutionCtx *cur_ctx)
 {
     werase(regsbuffer);
     box(regsbuffer, 0, 0);
-
+    if (cur_ctx->stage < 2) {
+        wrefresh(regsbuffer);
+        return;
+    }
     char *regStore = reinterpret_cast<char*>(&cur_ctx->cur_pos->regs);
     for (int idx = 0; idx < numRegs; idx++) {
         mvwprintw(regsbuffer, idx+1, 1, "%s: %p",
@@ -97,18 +107,29 @@ void redraw_regs(ExecutionCtx *cur_ctx)
     wrefresh(regsbuffer);
 }
 
-void handle_input(char *c)
+void do_exec()
 {
-    if (c == NULL)
-        return;
-    if (*c == '\0')
-        return;
-    cur_snippet->handleLine(c);
     cur_ctx = new ExecutionCtx;
     generateMachineCode(cur_snippet, *cur_ctx);
     redraw_codebuffer(cur_snippet);
-    gatherTrace(*cur_ctx);
+    if (cur_ctx->stage == 2)
+        gatherTrace(*cur_ctx);
     redraw_regs(cur_ctx);
+}
+
+void handle_input(char *c)
+{
+    // Don't do anything if there is no input (for either definition of 'no input'
+    if (c == NULL)
+        return;
+    // I may want to actually do something here...
+    if (*c == '\0')
+        return;
+    // call the actual handler
+    cur_snippet->handleLine(c);
+
+    // run the engine, and display the results.
+    do_exec();
     return;
 }
 
@@ -176,6 +197,8 @@ int rl_next(int arg, int key) {
 
 int rl_rstep(int arg, int key) {
     log("I was called!\n");
+    if (cur_ctx->cur_pos == cur_ctx->trace.begin())
+        return 0;
     cur_ctx->cur_pos--;
     redraw_codebuffer(cur_snippet);
     redraw_regs(cur_ctx);
@@ -184,9 +207,40 @@ int rl_rstep(int arg, int key) {
 
 int rl_step(int arg, int key) {
     log("I was called!\n");
+
     cur_ctx->cur_pos++;
+    if (cur_ctx->cur_pos == cur_ctx->trace.end()) {
+        cur_ctx->cur_pos--;
+        return 0;
+    }
     redraw_codebuffer(cur_snippet);
     redraw_regs(cur_ctx);
+    return 0;
+}
+
+int rl_kill(int arg, int key) {
+    log("kill was called!\n");
+
+    // if we're already on the last line, then nop.
+    if (cur_snippet->pos == cur_snippet->code.end()) {
+        return 0;
+    }
+
+    cur_snippet->pos = cur_snippet->code.erase(cur_snippet->pos);
+    // If we're now looking at the last instruction, don't restore its state
+    if (cur_snippet->pos != cur_snippet->code.end()) {
+        // restore the text of the previous position
+        char *tmp = (*cur_snippet->pos)->restoreText();
+        if (tmp == NULL) {
+            rl_replace_line("", 1);
+        } else {
+            rl_replace_line(tmp, 1);
+            rl_point = strlen(tmp);
+        }
+    } else {
+        rl_replace_line("", 1);
+    }
+    do_exec();
     return 0;
 }
 
@@ -200,6 +254,9 @@ void ui_init()
     initscr();
     noecho();
     start_color();
+    // initialize the error coloring
+    init_pair(1, COLOR_RED, COLOR_BLACK);
+    init_pair(2, COLOR_BLACK, COLOR_BLUE);
     raw();
     nodelay(stdscr, TRUE);
     curs_set(0);
@@ -209,10 +266,17 @@ void ui_init()
     rl_callback_handler_install ("", handle_input);
     rl_variable_bind("editing-mode", "emacs");
     Keymap km = rl_get_keymap();
+    // up
     rl_set_key("[A",  rl_rstep, km);
+    // down
     rl_set_key("[B",  rl_step, km);
+    // C-p
     rl_set_key("",  rl_prev, km);
+    // C-n
     rl_set_key("",  rl_next, km);
+
+    // C-k
+    rl_set_key("",  rl_kill, km);
 
     codebuffer = newwin(LINES-1, COLS-80, 0, 0);
     regsbuffer = newwin(LINES-1, 80, 0, COLS-80);
@@ -269,9 +333,19 @@ EditedSnippet::handleLine(char *line)
         code.push_back(new Line(line));
         return;
     }
-    // otherwise, if we are editing something, we want to save the changes
-    // and insert a new blank line here,  leaving focus on the new line
-    (*pos)->setText(line);
-    pos++;
-    pos = code.insert(pos, new Line(NULL));
+    if ((*pos)->render() != NULL && strcmp(line, (*pos)->render()) == 0) {
+        // if we haven't edited anything, no changes to save, so
+        // insert a new blank line here,  leaving focus on the new line
+
+        (*pos)->setText(line);
+        pos++;
+        pos = code.insert(pos, new Line(NULL));
+
+    } else {
+        // text has changed, probably some update, Don't bother trying to insert a new line.
+        (*pos)->setText(line);
+        rl_replace_line((*pos)->render(), 1);
+        rl_point = strlen((*pos)->render());
+
+    }
 }

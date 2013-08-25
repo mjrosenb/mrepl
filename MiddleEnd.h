@@ -21,6 +21,11 @@ class ExecutableInfo {
     void * sentinel;
     RunLog aslog;
     RunLog ldlog;
+    // how far along has everything gotten?
+    // 0 -> AS failed
+    // 1 -> LD failed
+    // 2 -> we executed
+    int stage;
 };
 
 void generateMachineCode(Snippet *s, ExecutableInfo &info);

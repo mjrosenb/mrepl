@@ -28,22 +28,28 @@ void ParseLines(CharBuf &log, LinesBuf *dest)
 
 void ParseAS(tmpRunLog &tmp, ExecutableInfo &info)
 {
+    fprintf(stderr, "parsing AS Output!\n");
     // split the temp buffer into a bunch of lines
     // which are easier to scan, etc.
     ParseLines(tmp.out, &info.aslog.out);
     ParseLines(tmp.err, &info.aslog.err);
-
+    
     // Now, extract useful information from this file.
-    for (int i = 0; i < info.aslog.out.numLines; i++) {
-        char *curLine = info.aslog.out.textLines[i];
+    for (int i = 0; i < info.aslog.err.numLines; i++) {
+        char *curLine = info.aslog.err.textLines[i];
+        fprintf(stderr, "Curent line is '%s'\n", curLine);
         // find the string "error"
         char *err = strstr(curLine, "Error:");
+        if (err == NULL)
+            continue;
         // The format that I seem to have here is filename:line: Error:'
         char *beforeNum = strchr(curLine, ':');
         assert(beforeNum != NULL);
         beforeNum++;
         long lineNum = strtol(beforeNum, NULL, 10);
         Line *asline = info.topLevel->lookupLine(lineNum);
+        fprintf(stderr, "found error: %s on line %d\n", err, lineNum);
+        
         asline->setError(err);
     }
 }

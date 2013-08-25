@@ -16,7 +16,7 @@ public:
     // render to the screen
     char *render() const;
     // format to be dumped into the assembly file
-    void dump(FILE *f, const char *name, int& count) const;
+    void dump(FILE *f, const char *name, int& count, int &lineno);
     void dumpTableEntry(FILE *f, const char *name, int& count) const;
     Line(char *);
     void setInst(void**&);
@@ -25,6 +25,7 @@ public:
     void saveText(char *newtext);
     char *restoreText() const;
     void setError(char *err);
+    char *getError();
     int getLineNo();
 };
 
@@ -40,12 +41,13 @@ class Snippet {
     const char *name;
 public:
     list<Line*> code;
-    void dump(FILE *f) const;
+    void dump(FILE *f, int &lineno) const;
     void dumpTable(FILE *f) const;
     void setInst(void*);
     Snippet();
     void assignInsts(void**& insts);
     Line *lookupLine(int num);
+    void clearErrors();
 };
 
 #endif

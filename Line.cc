@@ -25,22 +25,31 @@ Line::setText(char* newtext)
     // are now obsolete.
     free(editedText);
     editedText = NULL;
+    // editedText = strdup(newtext);
 }
 
 void
 Line::setError(char* newtext)
 {
-    text = newtext;
-
     // Since the new line has been finalized, any temp lines
     // are now obsolete.
     // don't bother freeing error, it is guaranteed to point into an allocated structure.
+    fprintf(stderr, "Attaching error to line \"%s\"\n", text);
     error = newtext;
+}
+
+char *
+Line::getError()
+{
+    return error;
 }
 
 void
 Line::saveText(char* newtext)
 {
+    // I can't think of any case that we'd ever want to save a blank line
+    if (*newtext == '\0')
+        return;
     // If there is already edited text, and it is the same as what we have here
     // don't do anything
     if (editedText != NULL && strcmp(newtext, editedText) == 0)
@@ -69,10 +78,12 @@ Line::render() const
 }
 
 void
-Line::dump(FILE *f, const char* name, int &labelNum) const
+Line::dump(FILE *f, const char* name, int &labelNum, int &lineNumber)
 {
     if (text == NULL)
         return;
+    lineNumber += 2;
+    lineno = lineNumber;
     fprintf(f, "_line%s%d:\n", name, labelNum);
     fprintf(f, "\t%s\n", text);
     labelNum++;
@@ -98,11 +109,11 @@ Snippet::Snippet() : name(""), code()
 }
 
 void
-Snippet::dump(FILE *f) const
+Snippet::dump(FILE *f, int &lineno) const
 {
     int labelNumber = 0;
     for (list<Line*>::const_iterator it = code.begin(); it != code.end(); it++) {
-        (*it)->dump(f, name, labelNumber);
+        (*it)->dump(f, name, labelNumber, lineno);
     }
 }
 
@@ -129,8 +140,18 @@ Line *
 Snippet::lookupLine(int num)
 {
     for (list<Line*>::iterator it = code.begin(); it != code.end(); it++) {
+        fprintf(stderr, "LOOKUP-- %d: '%s'\n", (*it)->getLineNo(), (*it)->render());
         if ((*it)->getLineNo() == num)
             return *it;
     }
     return NULL;
+}
+
+void
+Snippet::clearErrors()
+{
+    for (list<Line*>::iterator it = code.begin(); it != code.end(); it++) {
+        (*it)->setError(NULL);
+    }
+
 }

@@ -22,3 +22,5 @@ struct tmpRunLog {
     CharBuf err;
     int exitStatus;
 };
+
+void ParseAS(tmpRunLog &tmp, ExecutableInfo &info);

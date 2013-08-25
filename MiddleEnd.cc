@@ -21,7 +21,7 @@
 #include "BackEnd.h"
 #include "Debug.h"
 #include "ParseOutput.h"
-
+//xvoid ignore(int) {}
 // fork and exec a program, with arguments.
 void run(const char *file, char *const argv[], tmpRunLog &log)
 {
@@ -34,10 +34,13 @@ void run(const char *file, char *const argv[], tmpRunLog &log)
     int readfds[2];
     readfds[0] = pipeout[0];
     readfds[1] = pipeerr[0];
+    //sighandler_t prev = signal(SIGCHLD, )
     pid_t pid = fork();
     if (pid < 0)
         perror("Invoking as");
     if (pid != 0) {
+        close(pipeout[1]);
+        close(pipeerr[1]);
         int status;
         bool finished = false;
         fd_set rfds;
@@ -56,11 +59,12 @@ void run(const char *file, char *const argv[], tmpRunLog &log)
                 if (FD_ISSET(readfds[i], &rfds)) {
                     char buf[4096];
                     int size = read(readfds[i], buf, 4096);
-                    if (size < 0 && errno == EINVAL) {
+                    if (size == 0 || size < 0 && errno == EINVAL) {
                         // close off the fd on this end as well
                         close(readfds[i]);
                         readfds[i] = -1;
                         opencount--;
+                        continue;
                     }
                     bufs[i]->append(buf, size);
                 }
@@ -73,7 +77,7 @@ void run(const char *file, char *const argv[], tmpRunLog &log)
     } else {
         // close the read ends of these pipes, just because.
         close(pipeout[0]);
-        close(pipeout[1]);
+        close(pipeerr[0]);
 
         // duplicate the pipes down to the standard locations.
         dup2(pipeout[1], STDOUT_FILENO);
@@ -88,7 +92,6 @@ void run(const char *file, char *const argv[], tmpRunLog &log)
 // instruction, so we can reliably report the current instruction (Dissassembly is for chumps)
 void extractLineInfo(const char *exefile, Snippet *snip, ExecutableInfo &info)
 {
-    fprintf(stderr, "Using file: %s\n", exefile);
     // Open then mmap the file
     int fd = open(exefile, O_RDONLY);
     if (fd < 0) {
@@ -128,14 +131,12 @@ void extractLineInfo(const char *exefile, Snippet *snip, ExecutableInfo &info)
     // every other string-like thing in the file is just
     // an index into the data of this section
     Elf_Shdr *stringSection = &sections[header->e_shstrndx];
-    fprintf(stderr,"String table's header is %d\n",  header->e_shstrndx);
     // get the actual table
     char *stringTable = file + stringSection->sh_offset;
 
     // loop until we find the section labeled "lineMap"
     for (int idx = 0; idx < header->e_shnum; idx++) {
         char *name = stringTable + sections[idx].sh_name;
-        fprintf(stderr, "found section: '%s'\n", name);
         if (strcmp(name, "lineMap") == 0) {
             log("Found It\n");
             log("offset is: %d\n", sections[idx].sh_offset);
@@ -182,8 +183,9 @@ void generateMachineCode(Snippet *s, ExecutableInfo &info)
     fprintf(f, ".globl _start\n");
     fprintf(f, "_start:\n");
     fprintf(f, "int3\n");
+    int lineno = 3;
     // Dump the instruction stream into the file, leaving lots of labels in the way
-    s->dump(f);
+    s->dump(f, lineno);
 
     // Now, in order to map the addresses back to instructions, we want to
     // reference the label that was placed at the beginning of every instruction
@@ -202,16 +204,32 @@ void generateMachineCode(Snippet *s, ExecutableInfo &info)
     // refrence the last label as well
     fprintf(f, ".quad last\n");
     fclose(f);
+    // set the topLevel of the info field, since we'll be touching it from within the assembler
+    // error handling code.
+    info.topLevel = s;
+    info.stage = 0;
+
+    // Make sure there is nothing stale lingering from previous runs.
+    s->clearErrors();
+    // set the stage
     // run the assembler, this kills the current program if it fails!
     // type carefully!
     char *const asargs[] = {"as", asname, "-o", objname, NULL};
     tmpRunLog tmp_as;
     run("as", asargs, tmp_as);
+    if (tmp_as.exitStatus != 0) {
+        ParseAS(tmp_as, info);
+        return;
+    }
+    info.stage++;
     // run the linker, once again failure leads to termination
     char *const ldargs[] = {"ld", objname, "-o", exename, NULL};
     tmpRunLog tmp_ld;
     run("ld", ldargs, tmp_ld);
-
+    if (tmp_ld.exitStatus != 0) {
+        exit(1);
+    }
+    info.stage++;
     // at this point, in exename, there  should be an executable binary!
     // we want to parse the binary, extract some information that we've embedded
     // in it, and finally kick off to the backend for execution
@@ -219,5 +237,4 @@ void generateMachineCode(Snippet *s, ExecutableInfo &info)
 
     // store a bunch of information for the next phase
     info.exename = exename;
-    info.topLevel = s;
 }
