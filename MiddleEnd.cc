@@ -202,7 +202,7 @@ void generateMachineCode(Snippet *s, ExecutableInfo &info)
     fprintf(f, "_code_start:\n");
 
     fprintf(f, "int3\n");
-    int lineno = 3;
+    int lineno = 4;
     // Dump the instruction stream into the file, leaving lots of labels in the way
     s->dump(f, lineno);
 
