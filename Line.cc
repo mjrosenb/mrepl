@@ -176,8 +176,16 @@ Snippet::lookupLineByAddr(void* addr, bool exact)
     for (list<Line*>::iterator it = code.begin(); it != code.end(); it++) {
         fprintf(stderr, "checking out line %p\n", *it);
         fprintf(stderr, "LOOKUP-- %p: '%s'\n", (*it)->getAddr(), (*it)->render());
-        if ((*it)->getAddr() == addr)
-            return *it;
+        if ((*it)->getAddr() == addr) {
+            // there may actually be many lines with the same address.
+            // in general, we want the last such line.
+            prev = *it;
+            while (it != code.end() && (*it)->getAddr() == addr) {
+                prev = *it;
+                it++;
+            }
+            return prev;
+        }
         // if we're looking for an exact match, then don't bother with any of the previous elements.
         if (exact)
             continue;
