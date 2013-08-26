@@ -24,3 +24,4 @@ struct tmpRunLog {
 };
 
 void ParseAS(tmpRunLog &tmp, ExecutableInfo &info);
+void ParseLD(tmpRunLog &tmp, char *objfile, Snippet *s,  ExecutableInfo &info);
