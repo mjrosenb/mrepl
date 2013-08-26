@@ -42,13 +42,17 @@ void redraw_codebuffer(Snippet *snip)
     for (list<Line*>::const_iterator it = snip->code.begin();
          it != snip->code.end();
          it++, lineno++) {
+        char sigil = ' ';
         if (*cur_snippet->pos == *it) {
             wattron(codebuffer, A_REVERSE);
         }
         if ((*it)->getError()) {
             wattron(codebuffer, COLOR_PAIR(1));
         }
-        mvwprintw(codebuffer, lineno, 1, "%s", (*it)->render());
+        if (cur_ctx->stage == 2 && (*it) == cur_ctx->cur_pos->line) {
+            sigil = '>';
+        }
+        mvwprintw(codebuffer, lineno, 1, "%c%p: %s", sigil, (*it)->getAddr(), (*it)->render());
         if ((*it)->getError()) {
             wattroff(codebuffer, COLOR_PAIR(1));
         }
@@ -94,6 +98,9 @@ void redraw_regs(ExecutionCtx *cur_ctx)
     werase(regsbuffer);
     box(regsbuffer, 0, 0);
     if (cur_ctx->stage < 2) {
+        if (cur_snippet->pos != cur_snippet->code.end() && (*cur_snippet->pos)->getError() != NULL) {
+            mvwprintw(regsbuffer, 1,1, "%s", (*cur_snippet->pos)->getError());
+        }
         wrefresh(regsbuffer);
         return;
     }
@@ -111,9 +118,10 @@ void do_exec()
 {
     cur_ctx = new ExecutionCtx;
     generateMachineCode(cur_snippet, *cur_ctx);
-    redraw_codebuffer(cur_snippet);
+    fprintf(stderr, "generated machine code for %p\n", cur_snippet);
     if (cur_ctx->stage == 2)
         gatherTrace(*cur_ctx);
+    redraw_codebuffer(cur_snippet);
     redraw_regs(cur_ctx);
 }
 
@@ -160,6 +168,7 @@ int rl_prev(int arg, int key) {
     }
 
     redraw_codebuffer(cur_snippet);
+    redraw_regs(cur_ctx);
     return 0;
 }
 
@@ -192,6 +201,7 @@ int rl_next(int arg, int key) {
         rl_replace_line("", 1);
     }
     redraw_codebuffer(cur_snippet);
+    redraw_regs(cur_ctx);
     return 0;
 }
 
@@ -268,8 +278,10 @@ void ui_init()
     Keymap km = rl_get_keymap();
     // up
     rl_set_key("[A",  rl_rstep, km);
+    rl_set_key("OA",  rl_rstep, km);
     // down
     rl_set_key("[B",  rl_step, km);
+    rl_set_key("OB",  rl_step, km);
     // C-p
     rl_set_key("",  rl_prev, km);
     // C-n

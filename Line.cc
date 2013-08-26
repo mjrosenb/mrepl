@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <elf.h>
 
 #include "Line.h"
 #include "Debug.h"
@@ -9,13 +10,15 @@ Line::Line(char * text_) : text(text_), editedText(NULL)
 {
 }
 void
-Line::setInst(void**& newinst)
+Line::setInst(Elf_Sym *&sym, char *strtbl)
 {
     if (text == NULL)
         return;
-    inst = *newinst;
+    while (strncmp(strtbl + sym->st_name, "_line", strlen("_line")) != 0)
+        sym++;
+    inst = reinterpret_cast<void*>(sym->st_value);
     fprintf(stderr, "setting inst to: %p\n", inst);
-    newinst++;
+    sym++;
 }
 void *
 Line::getAddr()
@@ -134,12 +137,13 @@ Snippet::dumpTable(FILE *f) const
 
 
 void
-Snippet::assignInsts(void**& insts)
+Snippet::assignInsts(Elf_Sym*& syms, char *strtbl)
 {
-    base = *insts;
+    base = reinterpret_cast<void*>(syms->st_value);
+    syms++;
     fprintf(stderr, "setting base to: %p\n", base);
     for (list<Line*>::const_iterator it = code.begin(); it != code.end(); it++) {
-        (*it)->setInst(insts);
+        (*it)->setInst(syms, strtbl);
     }
 
 }
@@ -155,22 +159,49 @@ Snippet::lookupLine(int num)
     return NULL;
 }
 Line *
-Snippet::lookupLineByOffset(long off)
+
+Snippet::lookupLineByOffset(long off, bool exact)
 {
     void *addr = (reinterpret_cast<char*>(base) + off);
-    return lookupLineByAddr(addr);
+    return lookupLineByAddr(addr, exact);
 
 }
 
 Line *
-Snippet::lookupLineByAddr(void* addr)
+Snippet::lookupLineByAddr(void* addr, bool exact)
 {
+    fprintf(stderr, "doing lookup on %p\n", this);
+    Line *prev = NULL;
+    // for just a bit of extra fun, ld will report errors for *inside* of instructions
     for (list<Line*>::iterator it = code.begin(); it != code.end(); it++) {
-        fprintf(stderr, "LOOKUP-- %d: '%s'\n", (*it)->getLineNo(), (*it)->render());
-        if ((*it)->getAddr() == addr)
-            return *it;
+        fprintf(stderr, "checking out line %p\n", *it);
+        fprintf(stderr, "LOOKUP-- %p: '%s'\n", (*it)->getAddr(), (*it)->render());
+        if ((*it)->getAddr() == addr) {
+            // there may actually be many lines with the same address.
+            // in general, we want the last such line.
+            prev = *it;
+            while (it != code.end() && (*it)->getAddr() == addr) {
+                prev = *it;
+                it++;
+            }
+            return prev;
+        }
+        // if we're looking for an exact match, then don't bother with any of the previous elements.
+        if (exact)
+            continue;
+        if ((*it)->getAddr() > addr && prev->getAddr() < addr) {
+            return prev;
+        }
+        if ((*it)->render() != NULL)
+            prev = *it;
     }
-    return NULL;
+    if (exact)
+        return NULL;
+    // Oh god, I guess I have to assume that anything else is in the last instruction
+    // I can likely solve this in the future by making sure that the length of each instruction
+    // is recorded, in addition to the start of it.
+
+    return prev;
 }
 
 void

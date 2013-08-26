@@ -2,6 +2,14 @@
 #define __LINE_H
 #include <list>
 #include <stdio.h>
+#include <elf.h>
+
+// hardcode us to 64 bit elf for now, this is easy enough
+// to make conditional later
+#define Elf_Shdr Elf64_Shdr
+#define Elf_Ehdr Elf64_Ehdr
+#define Elf_Sym  Elf64_Sym
+
 using namespace std;
 // The repl accepts a single line at a time, stores them in an internal structure
 class Line {
@@ -19,7 +27,7 @@ public:
     void dump(FILE *f, const char *name, int& count, int &lineno);
     void dumpTableEntry(FILE *f, const char *name, int& count) const;
     Line(char *);
-    void setInst(void**&);
+    void setInst(Elf_Sym *& sym, char *strtbl);
     void *getAddr();
     void setText(char *newtext);
     void saveText(char *newtext);
@@ -46,10 +54,10 @@ public:
     void dumpTable(FILE *f) const;
     void setInst(void*);
     Snippet();
-    void assignInsts(void**& insts);
+    void assignInsts(Elf_Sym*& syms, char *strtbl);
     Line *lookupLine(int num);
-    Line *lookupLineByOffset(long offset);
-    Line *lookupLineByAddr(void *offset);
+    Line *lookupLineByOffset(long offset, bool exact);
+    Line *lookupLineByAddr(void *offset, bool exact);
     void clearErrors();
 };
 

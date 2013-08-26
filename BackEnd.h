@@ -7,6 +7,8 @@ class ExecutionState {
 public:
     user_regs_struct regs;
     Line *line;
+    void *getIP();
+
 };
 
 class ExecutionCtx : public ExecutableInfo {

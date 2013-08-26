@@ -8,7 +8,9 @@
 #include <assert.h>
 
 #include "BackEnd.h"
+#include "FrontEnd.h"
 #include "Debug.h"
+extern EditedSnippet *cur_snippet;
 pid_t initTrace(char *name) {
     pid_t pid = fork();
     if (pid < 0) {
@@ -45,10 +47,11 @@ void gatherTrace(ExecutionCtx &cx) {
         if (WIFSTOPPED(status)) {
             ExecutionState curState;
             ptrace(PTRACE_GETREGS, child, NULL, &curState.regs);
-            
             ptrace(PTRACE_SINGLESTEP, child, NULL, NULL);
+
+            curState.line = cur_snippet->lookupLineByAddr((void*)curState.getIP(), true);
             cx.trace.push_back(curState);
-            if (((void*)curState.regs.rip) == cx.sentinel) {
+            if (((void*)curState.getIP()) == cx.sentinel) {
                 cx.cur_pos--;
                 return;
             }
