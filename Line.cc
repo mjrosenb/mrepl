@@ -158,31 +158,39 @@ Snippet::lookupLine(int num)
 }
 Line *
 
-Snippet::lookupLineByOffset(long off)
+Snippet::lookupLineByOffset(long off, bool exact)
 {
     void *addr = (reinterpret_cast<char*>(base) + off);
-    return lookupLineByAddr(addr);
+    return lookupLineByAddr(addr, exact);
 
 }
 
 Line *
-Snippet::lookupLineByAddr(void* addr)
+Snippet::lookupLineByAddr(void* addr, bool exact)
 {
+    fprintf(stderr, "doing lookup on %p\n", this);
     Line *prev = NULL;
     // for just a bit of extra fun, ld will report errors for *inside* of instructions
     for (list<Line*>::iterator it = code.begin(); it != code.end(); it++) {
+        fprintf(stderr, "checking out line %p\n", *it);
         fprintf(stderr, "LOOKUP-- %p: '%s'\n", (*it)->getAddr(), (*it)->render());
         if ((*it)->getAddr() == addr)
             return *it;
+        // if we're looking for an exact match, then don't bother with any of the previous elements.
+        if (exact)
+            continue;
         if ((*it)->getAddr() > addr && prev->getAddr() < addr) {
             return prev;
         }
         if ((*it)->render() != NULL)
             prev = *it;
     }
+    if (exact)
+        return NULL;
     // Oh god, I guess I have to assume that anything else is in the last instruction
     // I can likely solve this in the future by making sure that the length of each instruction
     // is recorded, in addition to the start of it.
+
     return prev;
 }
 

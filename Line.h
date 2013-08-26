@@ -56,8 +56,8 @@ public:
     Snippet();
     void assignInsts(Elf_Sym*& syms);
     Line *lookupLine(int num);
-    Line *lookupLineByOffset(long offset);
-    Line *lookupLineByAddr(void *offset);
+    Line *lookupLineByOffset(long offset, bool exact);
+    Line *lookupLineByAddr(void *offset, bool exact);
     void clearErrors();
 };
 

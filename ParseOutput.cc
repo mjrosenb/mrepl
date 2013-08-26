@@ -90,7 +90,7 @@ void ParseLD(tmpRunLog &tmp, char *objfile, Snippet *s,  ExecutableInfo &info)
             log("'%s' the number doesn't end at ')' (it ends with '%s')", err, end);
             continue;
         }
-        Line* errline = s->lookupLineByOffset(offset);
+        Line* errline = s->lookupLineByOffset(offset, false);
         assert(errline != NULL);
         errline->setError(end+2);
     }
