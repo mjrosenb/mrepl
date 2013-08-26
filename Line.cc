@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <elf.h>
 
 #include "Line.h"
 #include "Debug.h"
@@ -9,13 +10,13 @@ Line::Line(char * text_) : text(text_), editedText(NULL)
 {
 }
 void
-Line::setInst(void**& newinst)
+Line::setInst(Elf_Sym *&sym)
 {
     if (text == NULL)
         return;
-    inst = *newinst;
+    inst = reinterpret_cast<void*>(sym->st_value);
     fprintf(stderr, "setting inst to: %p\n", inst);
-    newinst++;
+    sym++;
 }
 void *
 Line::getAddr()
@@ -134,12 +135,13 @@ Snippet::dumpTable(FILE *f) const
 
 
 void
-Snippet::assignInsts(void**& insts)
+Snippet::assignInsts(Elf_Sym*& syms)
 {
-    base = *insts;
+    base = reinterpret_cast<void*>(syms->st_value);
+    syms++;
     fprintf(stderr, "setting base to: %p\n", base);
     for (list<Line*>::const_iterator it = code.begin(); it != code.end(); it++) {
-        (*it)->setInst(insts);
+        (*it)->setInst(syms);
     }
 
 }
@@ -155,6 +157,7 @@ Snippet::lookupLine(int num)
     return NULL;
 }
 Line *
+
 Snippet::lookupLineByOffset(long off)
 {
     void *addr = (reinterpret_cast<char*>(base) + off);
@@ -165,12 +168,22 @@ Snippet::lookupLineByOffset(long off)
 Line *
 Snippet::lookupLineByAddr(void* addr)
 {
+    Line *prev = NULL;
+    // for just a bit of extra fun, ld will report errors for *inside* of instructions
     for (list<Line*>::iterator it = code.begin(); it != code.end(); it++) {
-        fprintf(stderr, "LOOKUP-- %d: '%s'\n", (*it)->getLineNo(), (*it)->render());
+        fprintf(stderr, "LOOKUP-- %p: '%s'\n", (*it)->getAddr(), (*it)->render());
         if ((*it)->getAddr() == addr)
             return *it;
+        if ((*it)->getAddr() > addr && prev->getAddr() < addr) {
+            return prev;
+        }
+        if ((*it)->render() != NULL)
+            prev = *it;
     }
-    return NULL;
+    // Oh god, I guess I have to assume that anything else is in the last instruction
+    // I can likely solve this in the future by making sure that the length of each instruction
+    // is recorded, in addition to the start of it.
+    return prev;
 }
 
 void

@@ -14,10 +14,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
-// hardcode us to 64 bit elf for now, this is easy enough
-// to make conditional later
-#define Elf_Shdr Elf64_Shdr
-#define Elf_Ehdr Elf64_Ehdr
+
 #include "BackEnd.h"
 #include "Debug.h"
 #include "ParseOutput.h"
@@ -132,21 +129,41 @@ void extractLineInfo(const char *exefile, Snippet *snip, ExecutableInfo &info)
     // an index into the data of this section
     Elf_Shdr *stringSection = &sections[header->e_shstrndx];
     // get the actual table
-    char *stringTable = file + stringSection->sh_offset;
-
+    char *shStringTable = file + stringSection->sh_offset;
+    Elf_Sym *symbols = NULL;
+    char *stringTable = NULL;
     // loop until we find the section labeled "lineMap"
     for (int idx = 0; idx < header->e_shnum; idx++) {
-        char *name = stringTable + sections[idx].sh_name;
-        if (strcmp(name, "lineMap") == 0) {
-            log("Found It\n");
+        char *name = shStringTable + sections[idx].sh_name;
+        if (strcmp(name, ".symtab") == 0) {
+            log("Found Symbol Table\n");
             log("offset is: %d\n", sections[idx].sh_offset);
-            void **map = reinterpret_cast<void**>(file + sections[idx].sh_offset);
-            snip->assignInsts(map);
-            log("found sentinel: %p\n", *map);
-            info.sentinel = *map;
-            break;
+            symbols = reinterpret_cast<Elf_Sym*>(file + sections[idx].sh_offset);
+            if (stringTable != NULL)
+                break;
+        } else if (strcmp(name, ".strtab") == 0) {
+            log("Found String Table\n");
+            log("offset is: %d\n", sections[idx].sh_offset);
+            stringTable = file + sections[idx].sh_offset;
+            if (symbols != NULL)
+                break;
         }
     }
+    fprintf(stderr, "looking at symbol: '%s'\n", stringTable + symbols->st_name);
+    // Scan through the symbol table, looking for the start of our code.
+    while (strcmp(stringTable + symbols->st_name, "_code_start") != 0) {
+        symbols++;
+    }
+    // now that symbols points to the symbol for the start of the symbols for our code,
+    // hand it off to the sub-structures
+    snip->assignInsts(symbols);
+    log("found sentinel: %p\n", symbols->st_value);
+    info.sentinel = reinterpret_cast<void*>(symbols->st_value);
+    // this assertion doesn't hold when the last thing the user enters is a label.
+    // Theoretically, I can scan forward while st_value doesn't change, and make sure one of them
+    // is called "last"
+    // assert(strcmp(stringTable + symbols->st_name, "last") == 0);
+
     munmap(file, stats.st_size);
     close(fd);
 }
@@ -182,6 +199,8 @@ void generateMachineCode(Snippet *s, ExecutableInfo &info)
     // fixed x86 header
     fprintf(f, ".globl _start\n");
     fprintf(f, "_start:\n");
+    fprintf(f, "_code_start:\n");
+
     fprintf(f, "int3\n");
     int lineno = 3;
     // Dump the instruction stream into the file, leaving lots of labels in the way
@@ -227,7 +246,8 @@ void generateMachineCode(Snippet *s, ExecutableInfo &info)
     tmpRunLog tmp_ld;
     run("ld", ldargs, tmp_ld);
     if (tmp_ld.exitStatus != 0) {
-        exit(1);
+        ParseLD(tmp_ld, objname, s, info);
+        return;
     }
     info.stage++;
     // at this point, in exename, there  should be an executable binary!
