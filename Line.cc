@@ -14,7 +14,13 @@ Line::setInst(void**& newinst)
     if (text == NULL)
         return;
     inst = *newinst;
+    fprintf(stderr, "setting inst to: %p\n", inst);
     newinst++;
+}
+void *
+Line::getAddr()
+{
+    return inst;
 }
 void
 Line::setText(char* newtext)
@@ -34,7 +40,7 @@ Line::setError(char* newtext)
     // Since the new line has been finalized, any temp lines
     // are now obsolete.
     // don't bother freeing error, it is guaranteed to point into an allocated structure.
-    fprintf(stderr, "Attaching error to line \"%s\"\n", text);
+    fprintf(stderr, "Attaching error (%s) to line \"%s\"\n", newtext, text);
     error = newtext;
 }
 
@@ -130,6 +136,8 @@ Snippet::dumpTable(FILE *f) const
 void
 Snippet::assignInsts(void**& insts)
 {
+    base = *insts;
+    fprintf(stderr, "setting base to: %p\n", base);
     for (list<Line*>::const_iterator it = code.begin(); it != code.end(); it++) {
         (*it)->setInst(insts);
     }
@@ -142,6 +150,24 @@ Snippet::lookupLine(int num)
     for (list<Line*>::iterator it = code.begin(); it != code.end(); it++) {
         fprintf(stderr, "LOOKUP-- %d: '%s'\n", (*it)->getLineNo(), (*it)->render());
         if ((*it)->getLineNo() == num)
+            return *it;
+    }
+    return NULL;
+}
+Line *
+Snippet::lookupLineByOffset(long off)
+{
+    void *addr = (reinterpret_cast<char*>(base) + off);
+    return lookupLineByAddr(addr);
+
+}
+
+Line *
+Snippet::lookupLineByAddr(void* addr)
+{
+    for (list<Line*>::iterator it = code.begin(); it != code.end(); it++) {
+        fprintf(stderr, "LOOKUP-- %d: '%s'\n", (*it)->getLineNo(), (*it)->render());
+        if ((*it)->getAddr() == addr)
             return *it;
     }
     return NULL;
