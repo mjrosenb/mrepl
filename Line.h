@@ -27,7 +27,7 @@ public:
     void dump(FILE *f, const char *name, int& count, int &lineno);
     void dumpTableEntry(FILE *f, const char *name, int& count) const;
     Line(char *);
-    void setInst(Elf_Sym *& sym);
+    void setInst(Elf_Sym *& sym, char *strtbl);
     void *getAddr();
     void setText(char *newtext);
     void saveText(char *newtext);
@@ -54,7 +54,7 @@ public:
     void dumpTable(FILE *f) const;
     void setInst(void*);
     Snippet();
-    void assignInsts(Elf_Sym*& syms);
+    void assignInsts(Elf_Sym*& syms, char *strtbl);
     Line *lookupLine(int num);
     Line *lookupLineByOffset(long offset, bool exact);
     Line *lookupLineByAddr(void *offset, bool exact);

@@ -156,7 +156,7 @@ void extractLineInfo(const char *exefile, Snippet *snip, ExecutableInfo &info)
     }
     // now that symbols points to the symbol for the start of the symbols for our code,
     // hand it off to the sub-structures
-    snip->assignInsts(symbols);
+    snip->assignInsts(symbols, stringTable);
     log("found sentinel: %p\n", symbols->st_value);
     info.sentinel = reinterpret_cast<void*>(symbols->st_value);
     // this assertion doesn't hold when the last thing the user enters is a label.

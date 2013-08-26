@@ -10,10 +10,12 @@ Line::Line(char * text_) : text(text_), editedText(NULL)
 {
 }
 void
-Line::setInst(Elf_Sym *&sym)
+Line::setInst(Elf_Sym *&sym, char *strtbl)
 {
     if (text == NULL)
         return;
+    while (strncmp(strtbl + sym->st_name, "_line", strlen("_line")) != 0)
+        sym++;
     inst = reinterpret_cast<void*>(sym->st_value);
     fprintf(stderr, "setting inst to: %p\n", inst);
     sym++;
@@ -135,13 +137,13 @@ Snippet::dumpTable(FILE *f) const
 
 
 void
-Snippet::assignInsts(Elf_Sym*& syms)
+Snippet::assignInsts(Elf_Sym*& syms, char *strtbl)
 {
     base = reinterpret_cast<void*>(syms->st_value);
     syms++;
     fprintf(stderr, "setting base to: %p\n", base);
     for (list<Line*>::const_iterator it = code.begin(); it != code.end(); it++) {
-        (*it)->setInst(syms);
+        (*it)->setInst(syms, strtbl);
     }
 
 }
