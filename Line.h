@@ -39,6 +39,7 @@ class  AssignLine : public MetaLine {
 // more than one of these.
 class Snippet {
     const char *name;
+    void *base;
 public:
     list<Line*> code;
     void dump(FILE *f, int &lineno) const;
@@ -47,6 +48,8 @@ public:
     Snippet();
     void assignInsts(void**& insts);
     Line *lookupLine(int num);
+    Line *lookupLineByOffset(long offset);
+    Line *lookupLineByAddr(void *offset);
     void clearErrors();
 };
 
