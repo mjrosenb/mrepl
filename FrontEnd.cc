@@ -278,8 +278,10 @@ void ui_init()
     Keymap km = rl_get_keymap();
     // up
     rl_set_key("[A",  rl_rstep, km);
+    rl_set_key("OA",  rl_rstep, km);
     // down
     rl_set_key("[B",  rl_step, km);
+    rl_set_key("OB",  rl_step, km);
     // C-p
     rl_set_key("",  rl_prev, km);
     // C-n
