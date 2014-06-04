@@ -14,6 +14,7 @@ list<Line*>::iterator prev(list<Line*>::iterator &x)
 template <typename T>
 typename list<T>::iterator next(typename list<T>::iterator &x)
 {
+
     typename list<T>::iterator tmp = x;
     return ++tmp;
 }

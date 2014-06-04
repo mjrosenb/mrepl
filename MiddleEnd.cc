@@ -39,7 +39,6 @@ void run(const char *file, char *const argv[], tmpRunLog &log)
         close(pipeout[1]);
         close(pipeerr[1]);
         int status;
-        bool finished = false;
         fd_set rfds;
         CharBuf *(bufs[2]) = {&log.out, &log.err};
 
@@ -52,11 +51,14 @@ void run(const char *file, char *const argv[], tmpRunLog &log)
                     FD_SET(readfds[i], &rfds);
             }
             int fdact = select(maxFD+1, &rfds, NULL, NULL, NULL);
+	    assert(fdact != 0);
+	    if (fdact < 0)
+	      perror("pollng processes");
             for (int i = 0; i < 2; i++) {
                 if (FD_ISSET(readfds[i], &rfds)) {
                     char buf[4096];
                     int size = read(readfds[i], buf, 4096);
-                    if (size == 0 || size < 0 && errno == EINVAL) {
+                    if (size == 0 || (size < 0 && errno == EINVAL)) {
                         // close off the fd on this end as well
                         close(readfds[i]);
                         readfds[i] = -1;
@@ -137,13 +139,13 @@ void extractLineInfo(const char *exefile, Snippet *snip, ExecutableInfo &info)
         char *name = shStringTable + sections[idx].sh_name;
         if (strcmp(name, ".symtab") == 0) {
             log("Found Symbol Table\n");
-            log("offset is: %d\n", sections[idx].sh_offset);
+            log("offset is: %ld\n", sections[idx].sh_offset);
             symbols = reinterpret_cast<Elf_Sym*>(file + sections[idx].sh_offset);
             if (stringTable != NULL)
                 break;
         } else if (strcmp(name, ".strtab") == 0) {
             log("Found String Table\n");
-            log("offset is: %d\n", sections[idx].sh_offset);
+            log("offset is: %ld\n", sections[idx].sh_offset);
             stringTable = file + sections[idx].sh_offset;
             if (symbols != NULL)
                 break;
@@ -157,7 +159,7 @@ void extractLineInfo(const char *exefile, Snippet *snip, ExecutableInfo &info)
     // now that symbols points to the symbol for the start of the symbols for our code,
     // hand it off to the sub-structures
     snip->assignInsts(symbols, stringTable);
-    log("found sentinel: %p\n", symbols->st_value);
+    log("found sentinel: 0x%lx\n", symbols->st_value);
     info.sentinel = reinterpret_cast<void*>(symbols->st_value);
     // this assertion doesn't hold when the last thing the user enters is a label.
     // Theoretically, I can scan forward while st_value doesn't change, and make sure one of them
